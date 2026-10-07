@@ -1,0 +1,5 @@
+flowchart
+
+(You ask for a diagram) -> [Claude writes DGMO] -> [show_diagram tool] -> <Does it parse?>
+  -yes-> (Picture in the pane)
+  -no-> [Error goes back to Claude] -> [Claude writes DGMO]
