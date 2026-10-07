@@ -1,6 +1,6 @@
 {
   "name": "dgmo-pane",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Renders each .dgmo file Claude writes or edits in a live side pane, and tells Claude the parser's errors",
   "types": "./types/index.d.ts",
   "author": {

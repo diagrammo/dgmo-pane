@@ -1,4 +1,4 @@
-import { expect, test } from 'claude-code/testing'
+import { expect, mock, test } from 'claude-code/testing'
 
 import { dgmoError, fitCells, pngSize } from '../hooks/layout'
 
@@ -29,7 +29,7 @@ test("takes dgmo's JSON error, else its stderr", async () => {
 test('an empty pane says how to fill it', async $ => {
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ plugin: 'dgmo-pane', surface, ...PANE, viewport: VIEWPORT })
-    expect(await ui.find({ type: 'Text', text: /No \.dgmo file yet/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /Nothing drawn yet/ })).toBeDefined()
     await ui.unmount()
   }
 })
@@ -51,6 +51,40 @@ test('a non-.dgmo edit leaves the pane empty', async ($, on) => {
   on('tool.call', () => ({ result: { type: 'create', filePath: '/work/notes.md' } }))
   await $.tool.call({ tool: 'Write', file_path: '/work/notes.md', content: '# hi\n' })
   const ui = await $.ui.mount({ plugin: 'dgmo-pane', surface: 'terminal', ...PANE, viewport: VIEWPORT })
-  expect(await ui.find({ type: 'Text', text: /No \.dgmo file yet/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /Nothing drawn yet/ })).toBeDefined()
   await ui.unmount()
+})
+
+test('show_diagram needs source', async $ => {
+  const ran = await $.tool.call({ tool: 'mcp__dgmo-pane__show_diagram', source: '  ' } as never)
+  expect(ran.isError).toBe(true)
+})
+
+test('show_diagram draws under its title and hands back the error', async ($, on) => {
+  on('fs.write', () => ({ value: undefined as never }))
+  const ran = await $.tool.call({
+    tool: 'mcp__dgmo-pane__show_diagram',
+    source: 'flowchart Demo\n\n(A) -> (B)',
+    title: 'Login flow',
+  } as never)
+  expect(String(ran.result)).toMatch(/could not render it/)
+
+  const ui = await $.ui.mount({ plugin: 'dgmo-pane', surface: 'terminal', ...PANE, viewport: VIEWPORT })
+  expect(await ui.find({ type: 'Text', text: /Login flow/ })).toBeDefined()
+  await ui.unmount()
+})
+
+test('/dgmo-pane with words asks Claude to draw them', async ($, on) => {
+  const sent: string[] = []
+  on('prompt.submit', ($, e) => {
+    sent.push(e.text)
+
+    return { text: e.text }
+  })
+  on('ui.open', () => ({ value: {} as never }))
+  const clock = mock.clock(on)
+  const out = await $.command.run({ command: 'dgmo-pane', args: 'the login flow' } as never)
+  expect(out.text).toBe('Asked Claude to draw it.')
+  await clock.advance(1)
+  expect(sent[0]).toMatch(/show_diagram tool: the login flow/)
 })

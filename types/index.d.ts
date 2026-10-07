@@ -1,6 +1,8 @@
 export type Diagram = {
   /** The .dgmo file shown, absolute. */
   path: string
+  /** What the pane calls it; the file name when absent. */
+  label?: string
   /** The last PNG that rendered, base64; sent inline so it draws over ssh too. */
   png?: string
   /** Its pixel size, read from the PNG header. */
