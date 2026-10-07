@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { Diagram } from '../types'
+import type { Diagram, Setup } from '../types'
 import { dgmoError, fitCells, pngSize } from './layout'
 
 const PANE = 'dgmo-pane'
@@ -22,6 +22,39 @@ const TOOL_DESCRIPTION = [
 ].join(' ')
 
 const diagram = atom({ plugin: 'dgmo-pane', key: 'diagram' } as const, null as Diagram | null)
+const setup = atom({ plugin: 'dgmo-pane', key: 'setup' } as const, { isDgmoMissing: false } as Setup)
+
+const PACKAGE = '@diagrammo/dgmo-cli'
+const INSTALL_COMMAND = `npm install -g ${PACKAGE}`
+const MISSING = `dgmo is not installed. The user can press Install dgmo in the pane, or run \`${INSTALL_COMMAND}\`.`
+
+const isDgmoMissing = ($: EngineInterface): Promise<boolean> =>
+  $.process.run(['dgmo', '--version']).then(
+    ran => ran.exitCode !== 0,
+    () => true,
+  )
+
+/** The pane's Install dgmo button: npm installs the CLI, then the last diagram draws again. */
+const installDgmo = async ($: EngineInterface): Promise<void> => {
+  await update($, setup, (old): Setup => ({ ...old, install: 'running', installError: undefined }))
+  const ran = await $.process.run(['npm', 'install', '-g', PACKAGE], { timeoutMs: 600_000 }).catch(() => undefined)
+  let installError: string | undefined
+  if (ran === undefined) {
+    installError = 'npm was not found. Install Node.js from nodejs.org, then press Install dgmo again.'
+  } else if (ran.exitCode !== 0) {
+    const last = ran.stderr.trim().split('\n').filter(line => line.trim() !== '').pop() ?? `exit ${ran.exitCode}`
+    installError = `npm install failed: ${last}`
+  } else if (await isDgmoMissing($)) {
+    installError = 'dgmo is installed, but this session cannot find it. Restart Claude Code.'
+  }
+  await update($, setup, (): Setup => ({
+    isDgmoMissing: installError !== undefined,
+    install: installError === undefined ? 'done' : 'failed',
+    installError,
+  }))
+  const last = await read($, diagram)
+  if (installError === undefined && last !== null) await render($, last.path, last.label)
+}
 
 /** Renders to temp files; only the newest render of a path writes the state. */
 let latest = 0
@@ -58,7 +91,13 @@ const render = async ($: EngineInterface, path: string, label?: string): Promise
       }
     }
   } catch (err) {
-    error = `could not show it: ${err instanceof Error ? err.message : String(err)}`
+    error = (await isDgmoMissing($))
+      ? MISSING
+      : `could not show it: ${err instanceof Error ? err.message : String(err)}`
+  }
+  const isMissing = error === MISSING
+  if ((await read($, setup)).isDgmoMissing !== isMissing) {
+    await update($, setup, old => ({ ...old, isDgmoMissing: isMissing }))
   }
   if (ticket !== latest) return error
 
@@ -196,6 +235,25 @@ export const register: Register = on => {
     const name = shown?.label ?? shown?.path.split('/').pop() ?? ''
     const status = shown === null ? '' : shown.isRendering ? ' · rendering…' : ''
     const header = `${name}${status}`
+
+    const ready = await read($, setup)
+    if (ready.isDgmoMissing) {
+      const { Box, Text, Button } = $.ui.resolve(e)
+
+      return (
+        <Box flexDirection="column">
+          <Text bold>dgmo is not installed</Text>
+          <Text>The pane needs the dgmo command to draw diagrams.</Text>
+          {ready.install === 'running' ? (
+            <Text>Installing {PACKAGE}…</Text>
+          ) : (
+            <Button key="install" label="Install dgmo" hotkey="i" onPress={() => installDgmo($)} />
+          )}
+          {ready.installError !== undefined && <Text color="red">✖ {ready.installError}</Text>}
+          <Text>Or run it yourself: {INSTALL_COMMAND}</Text>
+        </Box>
+      )
+    }
 
     if (e.surface === 'terminal') {
       const { Box, Text, Image } = $.ui.resolve(e)

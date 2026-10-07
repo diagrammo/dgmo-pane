@@ -17,8 +17,17 @@ export type Diagram = {
   isRendering: boolean
 }
 
+export type Setup = {
+  /** The last render could not start `dgmo`, and `dgmo --version` failed too. */
+  isDgmoMissing: boolean
+  /** The pane's Install dgmo button: absent until pressed. */
+  install?: 'running' | 'done' | 'failed'
+  /** Why the install did not leave a working `dgmo`. */
+  installError?: string
+}
+
 declare module 'claude-code' {
   interface PluginState {
-    'dgmo-pane': { diagram: Diagram | null }
+    'dgmo-pane': { diagram: Diagram | null; setup: Setup }
   }
 }

@@ -14,16 +14,9 @@ fixes it and tries again.
 
 ## Install
 
-You need two things first:
+You need **Claude Code 2.1.282 or later**. Check with `claude --version`.
 
-1. **Claude Code 2.1.282 or later**: check with `claude --version`.
-2. **The `dgmo` command**:
-
-   ```sh
-   npm install -g @diagrammo/dgmo-cli
-   ```
-
-Then, inside a Claude Code session in your terminal, run:
+Inside a Claude Code session in your terminal, run:
 
 ```
 /plugin install dgmo-pane --marketplace diagrammo/dgmo-pane
@@ -34,6 +27,11 @@ for a scope, choose **user** to have the pane in every project.
 
 **Restart Claude Code** (quit and run `claude` again). The `/dgmo-pane` command
 and the `show_diagram` tool are then ready.
+
+The pane draws with the `dgmo` command. If you don't have it, the pane says so
+the first time and offers an **Install dgmo** button, which runs
+`npm install -g @diagrammo/dgmo-cli` for you (this needs Node.js). You can also run that
+command yourself beforehand.
 
 ## Use it
 
@@ -75,7 +73,9 @@ claude plugin marketplace remove dgmo-pane
 | You see | Do this |
 | --- | --- |
 | `Unknown command: /dgmo-pane` right after installing | Restart Claude Code |
-| `could not show it: …` or `dgmo exited …` in the pane | Install `dgmo`: `npm install -g @diagrammo/dgmo-cli`, then check that `dgmo --version` works in the same shell you start `claude` from |
+| "dgmo is not installed" in the pane | Press **Install dgmo**, or run `npm install -g @diagrammo/dgmo-cli` |
+| "npm was not found" after pressing Install | Install Node.js from [nodejs.org](https://nodejs.org), then press Install dgmo again |
+| "dgmo is installed, but this session cannot find it" | Restart Claude Code. If it persists, check that `dgmo --version` works in the shell you start `claude` from |
 | The pane does not open by itself | It waits until the terminal is at least 144 columns wide. Widen the window, or run `/dgmo-pane` to open it at any width |
 | An empty box, or a one-line description where the picture should be | Your terminal cannot draw images. Use Ghostty or kitty, or the Claude desktop app |
 | Claude keeps getting DGMO syntax wrong | Run `dgmo install claude-code`. It gives Claude the full DGMO language reference |

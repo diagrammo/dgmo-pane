@@ -1,3 +1,4 @@
+import type { On } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
 
 import { dgmoError, fitCells, pngSize } from '../hooks/layout'
@@ -41,8 +42,7 @@ test('a .dgmo edit opens the pane and tells Claude why it did not render', async
 
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ plugin: 'dgmo-pane', surface, ...PANE, viewport: VIEWPORT })
-    expect(await ui.find({ type: 'Text', text: /flow\.dgmo/ })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: /could not show it/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /dgmo is not installed/ })).toBeDefined()
     await ui.unmount()
   }
 })
@@ -67,10 +67,54 @@ test('show_diagram draws under its title and hands back the error', async ($, on
     source: 'flowchart Demo\n\n(A) -> (B)',
     title: 'Login flow',
   } as never)
-  expect(String(ran.result)).toMatch(/could not render it/)
+  expect(String(ran.result)).toMatch(/dgmo is not installed/)
+  expect(String(ran.result)).toMatch(/npm install -g @diagrammo\/dgmo-cli/)
+})
 
+const ARGV: string[][] = []
+const answerProcess = (on: On, npm: 'ok' | 'absent') => {
+  ARGV.length = 0
+  on('process.run', (_$, e) => {
+    const argv = (e as unknown as { argv: string[] }).argv
+    ARGV.push(argv)
+    if (argv[0] === 'npm' && npm === 'ok') {
+      return { value: { exitCode: 0, stdout: '', stderr: '' } as never }
+    }
+
+    return { deny: `${argv[0]}: not found` }
+  })
+}
+
+test('a missing dgmo shows an Install button on every surface', async ($, on) => {
+  on('fs.write', () => ({ value: undefined as never }))
+  answerProcess(on, 'absent')
+  await $.tool.call({ tool: 'mcp__dgmo-pane__show_diagram', source: 'flowchart\n\n(A) -> (B)' } as never)
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const ui = await $.ui.mount({ plugin: 'dgmo-pane', surface, ...PANE, viewport: VIEWPORT })
+    expect(await ui.find({ key: 'install' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /npm install -g @diagrammo\/dgmo-cli/ })).toBeDefined()
+    await ui.unmount()
+  }
+})
+
+test('Install says when npm is missing', async ($, on) => {
+  on('fs.write', () => ({ value: undefined as never }))
+  answerProcess(on, 'absent')
+  await $.tool.call({ tool: 'mcp__dgmo-pane__show_diagram', source: 'flowchart\n\n(A) -> (B)' } as never)
   const ui = await $.ui.mount({ plugin: 'dgmo-pane', surface: 'terminal', ...PANE, viewport: VIEWPORT })
-  expect(await ui.find({ type: 'Text', text: /Login flow/ })).toBeDefined()
+  await ui.press({ key: 'install' })
+  expect(await ui.find({ type: 'Text', text: /Install Node\.js/ })).toBeDefined()
+  await ui.unmount()
+})
+
+test('Install runs npm and asks for a restart when dgmo is still not found', async ($, on) => {
+  on('fs.write', () => ({ value: undefined as never }))
+  answerProcess(on, 'ok')
+  await $.tool.call({ tool: 'mcp__dgmo-pane__show_diagram', source: 'flowchart\n\n(A) -> (B)' } as never)
+  const ui = await $.ui.mount({ plugin: 'dgmo-pane', surface: 'terminal', ...PANE, viewport: VIEWPORT })
+  await ui.press({ key: 'install' })
+  expect(ARGV).toContainEqual(['npm', 'install', '-g', '@diagrammo/dgmo-cli'])
+  expect(await ui.find({ type: 'Text', text: /Restart Claude Code/ })).toBeDefined()
   await ui.unmount()
 })
 
