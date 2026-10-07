@@ -1,0 +1,13 @@
+{
+  "name": "dgmo-pane",
+  "description": "Live dgmo diagram pane for Claude Code",
+  "owner": {
+    "name": "Diagrammo"
+  },
+  "plugins": [
+    {
+      "name": "dgmo-pane",
+      "source": "./"
+    }
+  ]
+}

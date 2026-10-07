@@ -1,0 +1,22 @@
+export type Diagram = {
+  /** The .dgmo file shown, absolute. */
+  path: string
+  /** The last PNG that rendered, base64; sent inline so it draws over ssh too. */
+  png?: string
+  /** Its pixel size, read from the PNG header. */
+  width?: number
+  height?: number
+  /** The last SVG that rendered, for surfaces without Image. */
+  svg?: string
+  /** Counts the renders that succeeded. */
+  generation: number
+  /** The parser's error for the latest save; the picture is the last good one. */
+  error?: string
+  isRendering: boolean
+}
+
+declare module 'claude-code' {
+  interface PluginState {
+    'dgmo-pane': { diagram: Diagram | null }
+  }
+}
